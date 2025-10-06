@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import authRoutes from "./routes/authRoutes.js";  // Import your authRoutes correctly
+import authMiddleware from "./middleware/authMiddleware.js";
 
 dotenv.config();
 
@@ -18,6 +19,10 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.error("❌ MongoDB connection error:", err));
 
 // Middleware
+app.get("/api/protected", authMiddleware, (req, res) => {
+  res.json({ message: "Access granted", userId: req.user.id });
+});
+
 app.use(cors());
 app.use(express.json());
 
