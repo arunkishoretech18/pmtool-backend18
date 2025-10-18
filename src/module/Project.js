@@ -1,20 +1,31 @@
-import mongoose from 'mongoose';
-const { Schema } = mongoose;
+import mongoose from "mongoose";
 
-const projectSchema = new Schema({
-  name: { type: String, required: true },
-  description: String,
-  owner: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  startDate: Date,
-  endDate: Date,
+const projectSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: [true, "Name is required"],
+    trim: true,
+  },
+  description: {
+    type: String,
+    trim: true,
+  },
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: [true, "Owner is required"],
+  },
+  startDate: {
+    type: Date,
+    default: Date.now,
+  },
+  endDate: {
+    type: Date,
+  },
 }, { timestamps: true });
 
-// Static methods
-projectSchema.statics.createProject = function(data) {
-  return this.create(data);
-};
-projectSchema.statics.getProjectsByUser = function(userId) {
-  return this.find({ owner: userId });
-};
+// Index for performance
+projectSchema.index({ owner: 1 });
 
-export default mongoose.model('Project', projectSchema);
+const Project = mongoose.model("Project", projectSchema);
+export default Project;

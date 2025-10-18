@@ -1,94 +1,78 @@
-// routes/authRoutes.js
-console.log("=== authRoutes.js is loaded! ===");
-
 import express from "express";
+import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import User from "../models/User.js";
+import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-
-// ========== REGISTER ROUTE ==========
-
-
+// Register a new user
 router.post("/register", async (req, res) => {
-  console.log("Request body:", req.body);
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
+      return res.status(400).json({ message: "Email and password are required." });
     }
 
-    const normalizedEmail = email.toLowerCase();
-
-    const existingUser = await User.findOne({ email: normalizedEmail });
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ error: "Email already registered." });
+      return res.status(400).json({ message: "Email already registered." });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ email: normalizedEmail, password: hashedPassword });
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const user = new User({ email, password: hashedPassword });
     await user.save();
 
-    console.log("User saved:", user);
-
-    return res.status(201).json({ message: "User registered successfully." });
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    return res.status(201).json({ token });
   } catch (error) {
-    console.error("Registration error:", error);
-    return res.status(500).json({ error: "Server error" });
+    console.error("[REGISTER] Error:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 });
-// ========== LOGIN ROUTE ==========
-router.post("/login", async (req, res) => {
-  console.log("📥 Incoming login request body:", req.body);
 
+// Login a user
+router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      console.log("❌ Missing email or password");
-      return res.status(400).json({ error: "Email and password are required" });
+      return res.status(400).json({ message: "Email and password are required." });
     }
 
-    const normalizedEmail = email.toLowerCase();
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email }).select("+password");
     if (!user) {
-      console.log("❌ No user found for email:", normalizedEmail);
-      return res.status(400).json({ error: "Invalid email or password" });
+      return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      console.log("❌ Incorrect password for:", normalizedEmail);
-      return res.status(400).json({ error: "Invalid email or password" });
+      return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    if (!process.env.JWT_SECRET) {
-      console.error("❌ Missing JWT_SECRET in environment variables");
-      return res.status(500).json({ error: "Server misconfiguration" });
-    }
-
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
-
-    console.log("✅ Login successful. Token generated for:", normalizedEmail);
-
-    return res.status(200).json({
-      message: "Login successful",
-      token,
-      user: { id: user._id, email: user.email },
-    });
-
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    return res.status(200).json({ token });
   } catch (error) {
-    console.error("💥 Login error:", error);
-    return res.status(500).json({ error: "Server error" });
+    console.error("[LOGIN] Error:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
-// Ensure the router is exported correctly!
+// Get authenticated user profile (protected route)
+router.get("/profile", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    return res.status(200).json(user);
+  } catch (error) {
+    console.error("[PROFILE] Error:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 export default router;

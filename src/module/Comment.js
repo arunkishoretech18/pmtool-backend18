@@ -1,18 +1,25 @@
-import mongoose from 'mongoose';
-const { Schema } = mongoose;
+import mongoose from "mongoose";
 
-const commentSchema = new Schema({
-  content: { type: String, required: true },
-  task_id: { type: Schema.Types.ObjectId, ref: 'Task', required: true },
-  user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+const commentSchema = new mongoose.Schema({
+  content: {
+    type: String,
+    required: [true, "Content is required"],
+    trim: true,
+  },
+  task_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Task",
+    required: [true, "Task ID is required"],
+  },
+  user_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: [true, "User ID is required"],
+  },
 }, { timestamps: true });
 
-// Static methods
-commentSchema.statics.createComment = function(data) {
-  return this.create(data);
-};
-commentSchema.statics.getCommentsByTask = function(taskId) {
-  return this.find({ task_id: taskId });
-};
+// Index for performance
+commentSchema.index({ task_id: 1, user_id: 1 });
 
-export default mongoose.model('Comment', commentSchema);
+const Comment = mongoose.model("Comment", commentSchema);
+export default Comment;
